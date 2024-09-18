@@ -37,8 +37,6 @@ int main(int argc, const char *argv[])
                 // Struct shared by threads.
                 sharedThreadStruct sharedStruct = createSharedThreadStruct(getFileSize(xciPart.path()));
 
-                std::cout << "0x" << std::hex << sharedStruct->fileSize << std::endl;
-
                 // Open source for reading.
                 std::ifstream xciSourceFile(xciPart.path(), std::ios::binary);
 
