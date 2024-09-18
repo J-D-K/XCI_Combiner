@@ -1,10 +1,11 @@
 #pragma once
-#include <mutex>
 #include <condition_variable>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 // Struct that is shared and coordinates threads
-typedef struct 
+typedef struct
 {
     // Mutex
     std::mutex bufferLock;
@@ -18,5 +19,13 @@ typedef struct
     std::vector<char> sharedBuffer;
     // Size of the file being read
     uint64_t fileSize;
-
 } threadStruct;
+
+using sharedThreadStruct = std::shared_ptr<threadStruct>;
+
+inline sharedThreadStruct createSharedThreadStruct(uint64_t fileSize)
+{
+    sharedThreadStruct newThreadStruct = std::make_shared<threadStruct>();
+    newThreadStruct->fileSize = fileSize;
+    return newThreadStruct;
+}

@@ -1,82 +1,71 @@
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <thread>
-#include <memory>
-
 #include "io.hpp"
-
-std::string getXciNameFromPath(const std::string &path)
-{
-    size_t lastSlash = path.find_last_of("/\\");
-    return path.substr(lastSlash + 1, path.npos);
-}
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <thread>
 
 int main(int argc, const char *argv[])
 {
     // Bail if not enough args supplied
-    if(argc < 3)
+    if (argc < 3)
     {
-        std::cout << "Usage: \nxciCombiner \"[source directory]\" \"[destination directory]\"";
+        std::cout << "Usage: xci_combiner \"[source directory]\" \"[destination directory]\"";
         return -1;
     }
 
-    // Store source and destination as C++ strings for easier manipulation
-    std::string sourceDirectory = argv[1];
-    std::string destinationDirectory = argv[2];
+    std::filesystem::path sourceDirectory = argv[1];
+    std::filesystem::path destinationDirectory = argv[2];
 
     // Iterate through source directory
-    for(const std::filesystem::directory_entry &entry : std::filesystem::directory_iterator(sourceDirectory))
+    for (const std::filesystem::directory_entry &currentEntry : std::filesystem::directory_iterator(sourceDirectory))
     {
-        if(entry.is_directory())
+        if (currentEntry.is_directory() == true)
         {
-            // Make the full path to final XCI
-            std::string xciPath = destinationDirectory + getXciNameFromPath(entry.path().string());
+            // Path to output XCI File
+            std::filesystem::path xciPath = destinationDirectory / currentEntry.path().filename();
 
-            std::cout << entry.path().string() << " -> " << xciPath << std::endl;
+            // Just print this so I know it's working...
+            std::cout << currentEntry.path() << " -> " << xciPath << std::endl;
 
-            // Open it for write thread
-            std::ofstream destinationXci(xciPath, std::ios::binary);
+            // Open output file
+            std::ofstream xciDestinationFile(xciPath, std::ios::binary);
 
-            // This should be the folder containing the split xci. Have to iterate again
-            for(const std::filesystem::directory_entry &xciEntry : std::filesystem::directory_iterator(entry.path()))
+            // Open the inner folder containing the xci parts.
+            for (const std::filesystem::directory_entry &xciPart : std::filesystem::directory_iterator(currentEntry))
             {
-                // Prepare struct for threads
-                std::shared_ptr<threadStruct> sendStruct = std::make_shared<threadStruct>();
-                sendStruct->fileSize = getFileSize(xciEntry.path().string());
+                // Struct shared by threads.
+                sharedThreadStruct sharedStruct = createSharedThreadStruct(getFileSize(xciPart.path()));
 
-                // Open source
-                std::ifstream source(xciEntry.path().string(), std::ios::binary);
+                std::cout << "0x" << std::hex << sharedStruct->fileSize << std::endl;
 
-                // Start read & write threads
-                std::thread read(readThread, std::ref(source), sendStruct);
-                std::thread write(writeThread, std::ref(destinationXci), sendStruct);
+                // Open source for reading.
+                std::ifstream xciSourceFile(xciPart.path(), std::ios::binary);
 
-                // Wait for finish
+                // Spawn read and write threads.
+                std::thread read(readThread, std::ref(xciSourceFile), sharedStruct);
+                std::thread write(writeThread, std::ref(xciDestinationFile), sharedStruct);
+
+                // Wait for them to finish.
                 read.join();
                 write.join();
             }
         }
         else
         {
-            // Just copy XCI to destination. Final path
-            std::string xciPath = destinationDirectory + getXciNameFromPath(entry.path().string());
+            // Just copy since it's probably less than 4GB
+            std::filesystem::path xciPath = destinationDirectory / currentEntry.path().filename();
 
-            std::cout << entry.path().string() << " -> " << xciPath << std::endl;
+            std::cout << currentEntry.path() << " -> " << xciPath << std::endl;
 
-            // Prepare struct
-            std::shared_ptr<threadStruct> sendStruct = std::make_shared<threadStruct>();
-            sendStruct->fileSize = getFileSize(entry.path().string());
+            sharedThreadStruct sharedStruct = createSharedThreadStruct(getFileSize(currentEntry.path()));
 
-            // Files
-            std::ifstream source(entry.path().string(), std::ios::binary);
-            std::ofstream destination(xciPath, std::ios::binary);
+            std::ifstream xciSource(currentEntry.path(), std::ios::binary);
+            std::ofstream xciDestination(xciPath, std::ios::binary);
 
-            // Threads
-            std::thread read(readThread, std::ref(source), sendStruct);
-            std::thread write(writeThread, std::ref(destination), sendStruct);
+            std::thread read(readThread, std::ref(xciSource), sharedStruct);
+            std::thread write(writeThread, std::ref(xciDestination), sharedStruct);
 
-            // Wait
             read.join();
             write.join();
         }
