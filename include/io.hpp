@@ -1,11 +1,12 @@
 #pragma once
-#include "threadStruct.hpp"
+#include "ThreadStruct.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <memory>
 
-// File related functions
-uint64_t getFileSize(const std::filesystem::path &filePath);
-// These are the thread functions for reading and writing from files.
-void readThread(std::ifstream &source, sharedThreadStruct sharedStruct);
-void writeThread(std::ofstream &destination, sharedThreadStruct sharedStruct);
+/// @brief Function executed on the read thread.
+void read_thread_function(std::ifstream &source, SharedThreadStruct sharedStruct);
+
+/// @brief Function called in the main thread to handle writing.
+void write_function(std::ofstream &destination, SharedThreadStruct sharedStruct);
